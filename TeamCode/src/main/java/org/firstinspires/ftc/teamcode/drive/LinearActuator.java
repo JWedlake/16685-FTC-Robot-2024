@@ -1,31 +1,40 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.drive;
+import org.firstinspires.ftc.teamcode.drive.MotorExtended;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.AnalogInput;
 import com.qualcomm.robotcore.hardware.DcMotor;
-
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
 
-@TeleOp(name="DriveCode")
-    public class DriveCode extends LinearOpMode {
-        //Motor Construction
+@TeleOp(name="LinearActuator")
+public class LinearActuator extends LinearOpMode {
+    //Initialization Varriables
+
+        //For all of these it allows you to change the port name all in one spot and fix the configuration
+
+        //Hang Motor
+        MotorExtended hangMotor = new MotorExtended(true,true,1,"hangRight",true);
+        //hangMotor.setEncoder(true);
+        MotorExtended linearActuator = new MotorExtended();
+        //linearActuator.setEncoder(true);
+
+        //DriveMotors
         DcMotor leftFront = null;
         DcMotor leftRear = null;
         DcMotor rightFront = null;
         DcMotor rightRear = null;
-        DcMotorEx BoatPoleAngle = null;
-        DcMotor BoatPoleExtension = null;
+
+        //Motor Construction
         DcMotor hangRight = null;
-        DcMotor hangLeft = null;
+        DcMotor LinearActuator = null;
         Servo servo1 = null;
-        Servo wrist = null;
         //Boat Pole Variables
-        double BPinputExtension = 0;
-        double boatPoleAngle = 0;
-        double boatPoleInputAngle = 0;
-        int boatPoleAngleCast = 0;
-        double wristPosition = .01;
         int hangAngle = 0;
+        int linearHeight = 0;
+        private VoltageSensor voltageSensor;
+
 
         //Drive Variables
         float turn = 0;
@@ -41,7 +50,7 @@ import com.qualcomm.robotcore.hardware.Servo;
         double sin = 0;
         double cos = 0;
         double max = 0.0;
-        boolean fineAjustment = false;
+        double presentVoltage;
 
         public void runOpMode() {
             //Initialize the Drive System
@@ -51,37 +60,21 @@ import com.qualcomm.robotcore.hardware.Servo;
                 rightRear = hardwareMap.get(DcMotor.class, "rightRear");
                 leftFront = hardwareMap.get(DcMotor.class, "leftFront");
                 leftRear = hardwareMap.get(DcMotor.class, "leftRear");
-                BoatPoleAngle = (DcMotorEx) hardwareMap.get(DcMotor.class, "boatAngle");
-                BoatPoleExtension = hardwareMap.get(DcMotor.class, "boatPull");
                 hangRight = hardwareMap.get(DcMotor.class, "hangRight");
-                hangLeft = hardwareMap.get(DcMotor.class, "hangLeft");
                 servo1 = hardwareMap.get(Servo.class, "servo1");
-                wrist = hardwareMap.get(Servo.class, "wrist");
+                voltageSensor = hardwareMap.get(VoltageSensor.class,"Control Hub");
 
                 //Set the Direction of Rotation for Each Motor
                 rightFront.setDirection(DcMotor.Direction.REVERSE);
                 rightRear.setDirection(DcMotor.Direction.REVERSE);
                 leftFront.setDirection(DcMotor.Direction.FORWARD);
                 leftRear.setDirection(DcMotor.Direction.FORWARD);
-                BoatPoleAngle.setDirection(DcMotor.Direction.FORWARD);
-                BoatPoleExtension.setDirection(DcMotor.Direction.FORWARD);
                 hangRight.setDirection(DcMotor.Direction.FORWARD);
-                hangLeft.setDirection(DcMotor.Direction.REVERSE);
 
                 servo1.setPosition(0.5);
-                wrist.setPosition(wristPosition);
-                BoatPoleAngle.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                BoatPoleAngle.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                boatPoleInputAngle = -75;
-                boatPoleAngle = 0;
-                BoatPoleExtension.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                BoatPoleExtension.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                BPextension(0,1);
                 hangAngle = 0;
                 hangRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
                 hangRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                hangLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                hangLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                 //Tell the User that the Drive System is Initialized
                 telemetry.addData("Status", "Drive System Initialized");
                 telemetry.addData("Drive Power", "Power (%.2f)", drivePower);
@@ -92,6 +85,7 @@ import com.qualcomm.robotcore.hardware.Servo;
             waitForStart();
 
             if (opModeIsActive()) {
+
                 while (opModeIsActive()) {
 
                     // TeleOP Drive Control
@@ -139,6 +133,7 @@ import com.qualcomm.robotcore.hardware.Servo;
                         drivePower = drivePower = 0.25;
                     }
 
+                    presentVoltage = voltageSensor.getVoltage();
                     //Grabber
                     if (gamepad2.a) {
                         servo1.setPosition(0.48);
@@ -152,49 +147,24 @@ import com.qualcomm.robotcore.hardware.Servo;
                     if (gamepad2.y) {
                         servo1.setPosition(.3);
                     }
-                    if (gamepad2.left_stick_button){
-                        fineAjustment=true;
-                    }
-                    if (gamepad2.right_stick_button){
-                        fineAjustment=false;
-                    }
 
-                    if (gamepad2.right_trigger > 0 && BPinputExtension < 2400) {
-                            BPinputExtension += 10;
-                            BPinputExtension = Math.min(Math.max(BPinputExtension, -50), 2400);
-                            BPextension((int) BPinputExtension, .5);
-                        }
+                    if (gamepad2.right_trigger > 0 && linearHeight < 2400) {
+                        linearHeight += 10;
+                        linearHeight = Math.min(Math.max(linearHeight, -50), 2400);
+                        linearActuator( linearHeight, 1);
+                    }
                     if (gamepad2.left_trigger > 0) {
-                        BPinputExtension -= 10;
-                        BPinputExtension = Math.min(Math.max(BPinputExtension, -100), 3750);
-                        BPextension((int) BPinputExtension, .5);
+                        linearHeight -= 10;
+                        linearHeight = Math.min(Math.max(linearHeight, 0), 2400);
+                        linearActuator( linearHeight, 1);
                     }
-                    if (gamepad2.left_stick_y < 0 && boatPoleAngle < 730) {
-                        boatPoleAngle += 3;
-                        boatPoleAngle = Math.min(Math.max(boatPoleAngle, 0), 730);
-                        BPAngle((int) boatPoleAngle, .5);
-                    }
-                    if (gamepad2.left_stick_y > 0) {
-
-                        if(boatPoleAngle<200||fineAjustment) {
-                            boatPoleAngle -= 1;
-                        }
-                        else {
-                            boatPoleAngle -= 3;
-                        }
-                        boatPoleAngle = Math.min(Math.max(boatPoleAngle, 0), 730);
-                        BPAngle((int) boatPoleAngle, .5);
+                    if(gamepad2.right_bumper) {
+                        linearHeight = 780;//IDK just an example varriable for the time being but allign to the wall
+                        linearActuator( linearHeight, 1);
                     }
 
-                    if (gamepad2.right_stick_y > 0){
-                        wristPosition -= .005;
-                        wristPosition = Math.min(Math.max(wristPosition, 0), 1);
-                        wrist.setPosition(wristPosition);
-                    }
-                    if (gamepad2.right_stick_y < 0){
-                        wristPosition += .005;
-                        wristPosition = Math.min(Math.max(wristPosition, 0), 1);
-                        wrist.setPosition(wristPosition);
+                    if(gamepad2.left_bumper) {
+                        Hook();
                     }
                     //hang code
                     if (gamepad2.dpad_up) {
@@ -208,27 +178,12 @@ import com.qualcomm.robotcore.hardware.Servo;
                         hangAngle = Math.min(Math.max(hangAngle, -2500), 0);
                         HangAngle(hangAngle,1);
                     }
-                    /*if (gamepad2.right_bumper) {
-                        hangLeft.setPower(-hangAngle);
-                        hangRight.setPower(-hangAngle);
-                        sleep(500);
-                        hangLeft.setPower(0);
-                        hangRight.setPower(0);
-                    }*/
-//                    if((1*hangRight.getCurrentPosition())<hangAngle){
-//                        hangRight.setPower(1);
-//                    }
-//                    if((1*hangRight.getCurrentPosition())>=hangAngle) {
-//                        hangRight.setPower(0);
-//                    }
+                    presentVoltage = voltageSensor.getVoltage();
                     {
                         telemetry.addData("Status", "Driver Control");
                         telemetry.addData("PowerMultipler", "Value (%.2f)", drivePower);
-                        telemetry.addData("BoatPoleAngle", ((int) ((BoatPoleAngle.getCurrentPosition() / ((537.7 * 4.775) / 360) - 76))));
-                        telemetry.addData("BoatPoleCast", boatPoleAngleCast);
-                        telemetry.addData("BoatPoleAngle", ((int) boatPoleAngle));
-                        telemetry.addData("LeftHang", hangLeft.getCurrentPosition());
                         telemetry.addData("RightHang", hangRight.getCurrentPosition());
+                        telemetry.addData("LinearActuator Position ", LinearActuator.getCurrentPosition());
                         telemetry.update();
                     }
                     //End of while statement
@@ -238,28 +193,35 @@ import com.qualcomm.robotcore.hardware.Servo;
 //end of opModeIsActive loop
         }
 
-        private void BPextension(int ticks,double power) {
+        private void linearActuator(int ticks,double power) {
             //ticks = Math.min(Math.max(ticks,0), 3000);
-            BoatPoleExtension.setTargetPosition(ticks);
-            BoatPoleExtension.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            BoatPoleExtension.setPower(power);
+            LinearActuator.setTargetPosition(ticks);
+            LinearActuator.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            LinearActuator.setPower(power);
         }
-        private void BPAngle(int ticks,double power) {
-            //ticks = Math.min(Math.max(ticks,0), 3000);
-            BoatPoleAngle.setTargetPosition(ticks);
-            BoatPoleAngle.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            BoatPoleAngle.setPower(power);
 
+        private void Hook() {
+            linearHeight=2000;//Need to determine top point
+            linearActuator(linearHeight,1);
+            while(LinearActuator.isBusy()) {
+            }
+            double voltageBenchmark = voltageSensor.getVoltage();
+            linearHeight=1850;//Height to hook just barely stressing actuator
+            linearActuator(linearHeight,1);
+            while(LinearActuator.isBusy()) {
+                if ((voltageBenchmark - voltageSensor.getVoltage()) > 2) //need to tune voltage amount
+                {
+                    servo1.setPosition(.3);
+                }
+            }
         }
         private void HangAngle(int ticks, double power) {
-
-            hangLeft.setTargetPosition(ticks);
-            hangLeft.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            hangLeft.setPower(power);
             hangRight.setTargetPosition(ticks);
             hangRight.setMode(DcMotor.RunMode.RUN_TO_POSITION);
             hangRight.setPower(power);
-            }
-
         }
+
+    }
+
+
 
